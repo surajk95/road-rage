@@ -1,0 +1,9 @@
+{
+    "name": "road-rage",
+    "version": "1.0.0",
+    "private": true,
+    "description": "A 3D Indian traffic survival game — parody of Indian roads",
+    "scripts": {
+        "dev": "npx serve ."
+    }
+}

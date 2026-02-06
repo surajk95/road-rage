@@ -1,0 +1,243 @@
+// ============================================================================
+//  Core game state, update loop, and UI wiring
+// ============================================================================
+import { scene, camera, dirLight } from "./scene.js";
+import {
+    LANE_LEFT, MIN_SPEED, MAX_SPEED, START_SPEED,
+    ACCEL, BRAKE_DECEL, NATURAL_DECEL, LANE_SWITCH_SPEED,
+    laneX, pickRandom, formatDistance,
+    POTHOLE_MSGS, POLICE_MSGS, TRAFFIC_MSGS, COW_MSGS, WRONGWAY_MSGS,
+} from "./config.js";
+import { createAutoRickshaw, createScooty } from "./vehicles.js";
+import {
+    obstacles, manageSpawning, updateObstacles,
+    checkCollisions, clearObstacles, honkNearby,
+    resetSpawning, createMenuTraffic,
+} from "./obstacles.js";
+import { updateRoadElements } from "./road.js";
+
+// =========================================================================
+//  State (exported so main.js can read current status)
+// =========================================================================
+export const state = {
+    current:   "menu",           // "menu" | "playing" | "gameover"
+    vehicleType: "auto",
+    lastVehicleType: "auto",
+    playerMesh: null,
+    playerZ:    0,
+    playerSpeed: START_SPEED,
+    playerLane: 0,               // 0 = left, 1 = right
+    distance:   0,
+    highScore:  parseInt(localStorage.getItem("roadrage_highscore") || "0", 10),
+    honkCooldown: 0,
+};
+
+// =========================================================================
+//  DOM refs (cached once)
+// =========================================================================
+const $menu       = document.getElementById("menu");
+const $hud        = document.getElementById("hud");
+const $speed      = document.getElementById("speed-display");
+const $distance   = document.getElementById("distance-display");
+const $highscore  = document.getElementById("highscore-display");
+const $gameover   = document.getElementById("gameover");
+const $goReason   = document.getElementById("gameover-reason");
+const $goMessage  = document.getElementById("gameover-message");
+const $goDist     = document.getElementById("go-dist");
+const $goHS       = document.getElementById("gameover-highscore");
+const $warning    = document.getElementById("warning");
+
+// =========================================================================
+//  Start / restart / back-to-menu
+// =========================================================================
+export function startGame(type) {
+    state.vehicleType     = type;
+    state.lastVehicleType = type;
+    state.current         = "playing";
+    state.playerZ         = 0;
+    state.playerSpeed     = START_SPEED;
+    state.playerLane      = 0;
+    state.distance        = 0;
+
+    clearObstacles();
+    resetSpawning(50);
+
+    // Create player vehicle
+    if (state.playerMesh) scene.remove(state.playerMesh);
+    state.playerMesh = type === "auto"
+        ? createAutoRickshaw(0x2e7d32)
+        : createScooty(0x1565c0);
+    state.playerMesh.position.set(LANE_LEFT, 0, 0);
+    scene.add(state.playerMesh);
+
+    // UI
+    $menu.classList.add("hidden");
+    $gameover.classList.add("hidden");
+    $hud.classList.remove("hidden");
+    refreshHighScoreHUD();
+}
+
+export function restartGame() {
+    startGame(state.lastVehicleType);
+}
+
+export function backToMenu() {
+    state.current = "menu";
+    if (state.playerMesh) { scene.remove(state.playerMesh); state.playerMesh = null; }
+    clearObstacles();
+    resetSpawning(50);
+    createMenuTraffic();
+
+    $gameover.classList.add("hidden");
+    $hud.classList.add("hidden");
+    $menu.classList.remove("hidden");
+}
+
+// =========================================================================
+//  Main per-frame update (called from main.js only when state === "playing")
+// =========================================================================
+export function update(rawDelta, keys) {
+    const delta = Math.min(rawDelta, 0.05); // clamp for tab-switch safety
+
+    // ---- Read input (A/D swapped to match screen direction) ----
+    const accel   = keys.ArrowUp    || keys.KeyW;
+    const brake   = keys.ArrowDown  || keys.KeyS;
+    const goLeft  = keys.ArrowLeft  || keys.KeyD;
+    const goRight = keys.ArrowRight || keys.KeyA;
+    const honk    = keys.Space;
+
+    // ---- Speed ----
+    if (accel) {
+        state.playerSpeed = Math.min(MAX_SPEED, state.playerSpeed + ACCEL * delta);
+    } else if (brake) {
+        state.playerSpeed = Math.max(MIN_SPEED * 0.5, state.playerSpeed - BRAKE_DECEL * delta);
+    } else {
+        const cruise = MIN_SPEED + (MAX_SPEED - MIN_SPEED) * 0.3;
+        if (state.playerSpeed > cruise)   state.playerSpeed -= NATURAL_DECEL * delta;
+        else if (state.playerSpeed < MIN_SPEED) state.playerSpeed += ACCEL * 0.5 * delta;
+    }
+
+    // ---- Forward movement ----
+    const dz = state.playerSpeed * delta;
+    state.playerZ += dz;
+    state.distance += dz;
+
+    // ---- Lane switching ----
+    if (goLeft)  state.playerLane = 0;
+    if (goRight) state.playerLane = 1;
+
+    const targetX = laneX(state.playerLane);
+    const prevX   = state.playerMesh.position.x;
+    state.playerMesh.position.x += (targetX - prevX) * LANE_SWITCH_SPEED * delta;
+    state.playerMesh.position.z  = state.playerZ;
+
+    // ---- Vehicle tilt on lane change ----
+    state.playerMesh.rotation.z = -(state.playerMesh.position.x - prevX) * 2.5;
+
+    // ---- Road vibration & bumps (feel the Indian road) ----
+    const speedNorm = state.playerSpeed / MAX_SPEED;
+    const pz = state.playerZ;
+    const bumpAmp = 0.02 + speedNorm * 0.04;
+    const bump = Math.sin(pz * 2.3) * bumpAmp
+               + Math.sin(pz * 5.7) * bumpAmp * 0.35
+               + Math.sin(pz * 0.7) * bumpAmp * 0.6;
+    state.playerMesh.position.y = bump;
+    // subtle forward pitch wobble
+    state.playerMesh.rotation.x = Math.sin(pz * 3.1) * 0.02 * speedNorm;
+
+    // ---- Honk ----
+    if (honk) doHonk();
+    state.honkCooldown = Math.max(0, state.honkCooldown - delta);
+
+    // ---- Obstacles ----
+    manageSpawning(state.playerZ, state.distance);
+    updateObstacles(delta, state.playerZ);
+
+    const hit = checkCollisions(state.playerMesh, state.vehicleType);
+    if (hit) { triggerGameOver(hit); return; }
+
+    // ---- Road ----
+    updateRoadElements(state.playerZ);
+
+    // ---- Camera (low & close for claustrophobic speed feel) ----
+    const camTargetX = state.playerMesh.position.x * 0.5;
+    camera.position.x += (camTargetX - camera.position.x) * 5 * delta;
+    camera.position.y  = 3.0;
+    camera.position.z  = state.playerZ - 5.5;
+    camera.lookAt(state.playerMesh.position.x * 0.6, 0.5, state.playerZ + 12);
+
+    // Camera shake / vibration — scales with speed
+    const shakeAmp = 0.012 + speedNorm * 0.05;
+    camera.position.x += Math.sin(pz * 7.3)  * shakeAmp * 0.5;
+    camera.position.y += Math.sin(pz * 11.1) * shakeAmp * 0.25
+                       + Math.sin(pz * 5.7)  * shakeAmp * 0.15;
+
+    // Dynamic FOV — tight at low speed, wide at high speed
+    const targetFov = 58 + speedNorm * 30;
+    camera.fov += (targetFov - camera.fov) * 3 * delta;
+    camera.updateProjectionMatrix();
+
+    // ---- Light follows player ----
+    dirLight.position.set(state.playerMesh.position.x + 10, 20, state.playerZ + 15);
+    dirLight.target.position.set(state.playerMesh.position.x, 0, state.playerZ);
+    dirLight.target.updateMatrixWorld();
+
+    // ---- HUD ----
+    $speed.textContent    = Math.floor(state.playerSpeed * 3.6) + " km/h";
+    $distance.textContent = formatDistance(state.distance);
+}
+
+// =========================================================================
+//  Honk
+// =========================================================================
+const HONK_TEXTS = ["HONK!", "BEEP BEEP!", "PEE PEE PEE!", "HORN OK!"];
+
+function doHonk() {
+    if (state.honkCooldown > 0) return;
+    state.honkCooldown = 0.5;
+
+    $warning.textContent = pickRandom(HONK_TEXTS);
+    $warning.classList.add("show");
+    setTimeout(() => $warning.classList.remove("show"), 300);
+
+    honkNearby(state.playerZ);
+}
+
+// =========================================================================
+//  Game over
+// =========================================================================
+const MESSAGES_BY_TYPE = {
+    pothole:  { msgs: POTHOLE_MSGS,  reason: "You hit a pothole!" },
+    police:   { msgs: POLICE_MSGS,   reason: "Caught by Traffic Police!" },
+    cow:      { msgs: COW_MSGS,      reason: "You hit a cow!" },
+    wrongway: { msgs: WRONGWAY_MSGS, reason: "Head-on collision!" },
+};
+
+function triggerGameOver(obstacle) {
+    state.current = "gameover";
+
+    const entry  = MESSAGES_BY_TYPE[obstacle.type] ||
+                   { msgs: TRAFFIC_MSGS, reason: "Traffic collision!" };
+    const dist   = Math.floor(state.distance);
+
+    if (dist > state.highScore) {
+        state.highScore = dist;
+        localStorage.setItem("roadrage_highscore", state.highScore.toString());
+    }
+
+    $goReason.textContent  = pickRandom(entry.msgs);
+    $goMessage.textContent = entry.reason;
+    $goDist.textContent    = formatDistance(dist);
+    $goHS.textContent      = "Best: " + formatDistance(state.highScore);
+    $gameover.classList.remove("hidden");
+    $hud.classList.add("hidden");
+}
+
+// =========================================================================
+//  HUD high-score refresh
+// =========================================================================
+function refreshHighScoreHUD() {
+    $highscore.textContent = state.highScore > 0
+        ? "Best: " + formatDistance(state.highScore)
+        : "";
+}
