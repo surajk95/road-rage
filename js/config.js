@@ -21,6 +21,24 @@ export const BRAKE_DECEL      = 25;
 export const NATURAL_DECEL    = 2;
 export const LANE_SWITCH_SPEED = 10;
 
+// ----- Per-vehicle physics -----
+export const VEHICLE_PHYSICS = {
+    auto: {
+        accel: 20,            // high acceleration
+        maxSpeed: 30,         // lower top speed (~61 km/h)
+        laneSwitchSpeed: 5,   // heavy but responsive lane change
+        brakeDecel: 22,
+        naturalDecel: 2.5,
+    },
+    scooty: {
+        accel: 9,             // less acceleration
+        maxSpeed: 68,         // a bit higher top speed
+        laneSwitchSpeed: 22,  // lightning-fast lane switches
+        brakeDecel: 30,
+        naturalDecel: 1.5,
+    },
+};
+
 // ----- Spawning -----
 export const SPAWN_AHEAD    = 200;
 export const DESPAWN_BEHIND = 40;
@@ -32,7 +50,7 @@ export const HITBOXES = {
     truck:    { width: 2.0, length: 5.5 },
     car:      { width: 1.6, length: 3.2 },
     bus:      { width: 2.1, length: 5.5 },
-    cow:      { width: 1.0, length: 1.8 },
+    cow:      { width: 1.8, length: 2.0 },
     pothole:  { width: 1.2, length: 1.2 },
     police:   { width: 1.2, length: 0.8 },
     wrongway: { width: 1.6, length: 3.2 },

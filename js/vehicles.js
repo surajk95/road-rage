@@ -273,53 +273,147 @@ export function createCow() {
     const brownMat = new THREE.MeshPhongMaterial({ color: 0x8d6e63 });
     const blkMat   = new THREE.MeshPhongMaterial({ color: 0x111111 });
 
-    // body
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.8, 1.6), bodyMat);
-    body.position.set(0, 0.9, 0);
+    // Sitting body — low to the ground
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.65, 1.4), bodyMat);
+    body.position.set(0, 0.35, 0);
     body.castShadow = true;
     g.add(body);
 
-    // brown spots
-    const spot1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.4), brownMat);
-    spot1.position.set(0.35, 1.05, 0.2);
-    g.add(spot1);
-    const spot2 = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 0.35), brownMat);
-    spot2.position.set(-0.3, 1.0, -0.3);
-    g.add(spot2);
+    // Folded front legs (visible bumps)
+    for (const x of [-0.3, 0.3]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.35), bodyMat);
+        leg.position.set(x, 0.1, -0.4);
+        g.add(leg);
+    }
+    // Folded rear legs (tucked under)
+    for (const x of [-0.3, 0.3]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.18, 0.3), bodyMat);
+        leg.position.set(x, 0.09, 0.35);
+        g.add(leg);
+    }
 
-    // head
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), bodyMat);
-    head.position.set(0, 1.1, 1.0);
+    // Neck (angled upward toward -Z / viewer)
+    const neck = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.35), bodyMat);
+    neck.position.set(0, 0.7, -0.65);
+    neck.rotation.x = 0.3;
+    g.add(neck);
+
+    // Head — facing viewer (-Z)
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.4), bodyMat);
+    head.position.set(0, 0.95, -0.85);
     g.add(head);
 
-    // horns
-    for (const x of [-0.2, 0.2]) {
+    // Muzzle
+    const nose = new THREE.Mesh(
+        new THREE.BoxGeometry(0.3, 0.22, 0.15),
+        new THREE.MeshPhongMaterial({ color: 0xdeb887 }),
+    );
+    nose.position.set(0, 0.85, -1.08);
+    g.add(nose);
+
+    // Eyes (facing -Z)
+    for (const x of [-0.13, 0.13]) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), blkMat);
+        eye.position.set(x, 1.0, -1.06);
+        g.add(eye);
+    }
+
+    // Ears
+    for (const x of [-0.28, 0.28]) {
+        const ear = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.15), bodyMat);
+        ear.position.set(x, 1.02, -0.8);
+        ear.rotation.z = x > 0 ? -0.4 : 0.4;
+        g.add(ear);
+    }
+
+    // Horns
+    for (const x of [-0.18, 0.18]) {
         const horn = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.02, 0.04, 0.2, 5),
+            new THREE.CylinderGeometry(0.02, 0.04, 0.22, 5),
             new THREE.MeshPhongMaterial({ color: 0xbdbdbd }),
         );
-        horn.position.set(x, 1.45, 1.0);
+        horn.position.set(x, 1.2, -0.82);
         horn.rotation.z = x > 0 ? -0.3 : 0.3;
         g.add(horn);
     }
 
-    // eyes
-    for (const x of [-0.12, 0.12]) {
-        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), blkMat);
-        eye.position.set(x, 1.2, 1.26);
-        g.add(eye);
+    // Brown spots
+    const spot1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.4), brownMat);
+    spot1.position.set(0.35, 0.5, 0.1);
+    g.add(spot1);
+    const spot2 = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.2, 0.35), brownMat);
+    spot2.position.set(-0.3, 0.45, -0.2);
+    g.add(spot2);
+
+    // Tail (lying on the ground behind)
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.5), brownMat);
+    tail.position.set(0.15, 0.15, 0.9);
+    g.add(tail);
+
+    // --- Calves sitting nearby (1-2, part of the cow group) ---
+    const numCalves = 1 + Math.floor(Math.random() * 2);
+    for (let c = 0; c < numCalves; c++) {
+        const calf = _buildCalf();
+        calf.position.set(
+            0.65 + c * 0.35,
+            0,
+            -0.15 + c * 0.65,
+        );
+        calf.rotation.y = (Math.random() - 0.5) * 0.5;
+        g.add(calf);
     }
 
-    // legs
-    for (const [x, z] of [[-0.25, 0.5], [0.25, 0.5], [-0.25, -0.5], [0.25, -0.5]]) {
-        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.5, 0.15), bodyMat);
-        leg.position.set(x, 0.25, z);
+    return g;
+}
+
+/** Internal helper — builds a single sitting calf mesh */
+function _buildCalf() {
+    const g        = new THREE.Group();
+    const bodyMat  = new THREE.MeshPhongMaterial({ color: 0xf0dfc0 });
+    const brownMat = new THREE.MeshPhongMaterial({ color: 0xb08968 });
+    const blkMat   = new THREE.MeshPhongMaterial({ color: 0x111111 });
+
+    // Tiny sitting body
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.4, 0.8), bodyMat);
+    body.position.set(0, 0.22, 0);
+    body.castShadow = true;
+    g.add(body);
+
+    // Folded legs
+    for (const [x, z] of [[-0.18, -0.25], [0.18, -0.25], [-0.18, 0.2], [0.18, 0.2]]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.18), bodyMat);
+        leg.position.set(x, 0.06, z);
         g.add(leg);
     }
 
-    // tail
-    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.5), brownMat);
-    tail.position.set(0, 0.95, -1.05);
+    // Head — facing viewer (-Z)
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.28, 0.25), bodyMat);
+    head.position.set(0, 0.5, -0.5);
+    g.add(head);
+
+    // Big calf eyes
+    for (const x of [-0.08, 0.08]) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), blkMat);
+        eye.position.set(x, 0.54, -0.64);
+        g.add(eye);
+    }
+
+    // Ears
+    for (const x of [-0.18, 0.18]) {
+        const ear = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.08), bodyMat);
+        ear.position.set(x, 0.58, -0.45);
+        ear.rotation.z = x > 0 ? -0.5 : 0.5;
+        g.add(ear);
+    }
+
+    // Spot
+    const spot = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.15, 0.22), brownMat);
+    spot.position.set(0.18, 0.3, 0.1);
+    g.add(spot);
+
+    // Little tail
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.25), brownMat);
+    tail.position.set(0, 0.12, 0.5);
     g.add(tail);
 
     return g;

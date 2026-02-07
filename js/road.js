@@ -1,5 +1,5 @@
 // ============================================================================
-//  Road system — surface, markings, gutters, buildings, poles
+//  Road system — surface, markings, gutters, buildings, poles, skyscrapers
 //  Designed to feel like a tight, congested Indian market road.
 // ============================================================================
 import * as THREE from "three";
@@ -11,13 +11,15 @@ let road, gutterLeft, gutterRight, footpathLeft, footpathRight;
 let groundLeft, groundRight;
 
 export const roadElements = {
-    markings:       [],
-    edgesLeft:      [],
-    edgesRight:     [],
-    buildingsLeft:  [],
-    buildingsRight: [],
-    polesLeft:      [],
-    polesRight:     [],
+    markings:           [],
+    edgesLeft:          [],
+    edgesRight:         [],
+    buildingsLeft:      [],
+    buildingsRight:     [],
+    polesLeft:          [],
+    polesRight:         [],
+    skyscrapersLeft:    [],
+    skyscrapersRight:   [],
 };
 
 // ----- Color palettes -----
@@ -33,17 +35,25 @@ const AWNING_COLORS = [
     0xe53935, 0x1e88e5, 0x43a047, 0xfb8c00,
     0x8e24aa, 0x00897b, 0xd81b60, 0x3949ab,
 ];
+const SKYSCRAPER_COLORS = [
+    0x6b7b8d, 0x7d8a96, 0x5a6a7a, 0x8899aa,
+    0x4a5a6a, 0x9ab0c0, 0x708090, 0x5c6d7e,
+];
 
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 // ----- Recycling constants -----
-const BUILDING_SPACING = 3.6;
-const BUILDING_COUNT   = 42;   // enough to tile beyond fog distance
-const BUILDING_SPAN    = BUILDING_COUNT * BUILDING_SPACING;  // total z-coverage
+const BUILDING_SPACING = 3.4;
+const BUILDING_COUNT   = 46;
+const BUILDING_SPAN    = BUILDING_COUNT * BUILDING_SPACING;
 
 const POLE_SPACING = 28;
 const POLE_COUNT   = 12;
 const POLE_SPAN    = POLE_COUNT * POLE_SPACING;
+
+const SKYSCRAPER_SPACING = 14;
+const SKYSCRAPER_COUNT   = 18;
+const SKYSCRAPER_SPAN    = SKYSCRAPER_COUNT * SKYSCRAPER_SPACING;
 
 // =========================================================================
 //  Build the entire road environment once
@@ -123,7 +133,7 @@ export function initRoad() {
     }
 
     // ---- Buildings & shops (the main event) ----
-    const buildingXLeft  = -HW - 1.05 - 1.2;   // center of left building row
+    const buildingXLeft  = -HW - 1.05 - 1.2;
     const buildingXRight =  HW + 1.05 + 1.2;
 
     for (let i = 0; i < BUILDING_COUNT; i++) {
@@ -152,6 +162,22 @@ export function initRoad() {
         scene.add(pR);
         roadElements.polesRight.push(pR);
     }
+
+    // ---- Skyscrapers (behind building row, fill the skyline) ----
+    const skyXLeft  = -HW - 9;
+    const skyXRight =  HW + 9;
+
+    for (let i = 0; i < SKYSCRAPER_COUNT; i++) {
+        const sL = makeSkyscraper(skyXLeft, -1);
+        sL.position.z = -15 + i * SKYSCRAPER_SPACING;
+        scene.add(sL);
+        roadElements.skyscrapersLeft.push(sL);
+
+        const sR = makeSkyscraper(skyXRight, 1);
+        sR.position.z = -15 + i * SKYSCRAPER_SPACING + SKYSCRAPER_SPACING * 0.5;
+        scene.add(sR);
+        roadElements.skyscrapersRight.push(sR);
+    }
 }
 
 // =========================================================================
@@ -176,6 +202,10 @@ export function updateRoadElements(playerZ) {
     // Utility poles — same approach
     recycleLoop(roadElements.polesLeft,  playerZ, POLE_SPAN, 20);
     recycleLoop(roadElements.polesRight, playerZ, POLE_SPAN, 20);
+
+    // Skyscrapers
+    recycleLoop(roadElements.skyscrapersLeft,  playerZ, SKYSCRAPER_SPAN, 20);
+    recycleLoop(roadElements.skyscrapersRight, playerZ, SKYSCRAPER_SPAN, 20);
 
     // Surfaces follow the player
     road.position.z          = playerZ;
@@ -207,8 +237,8 @@ function makeBuildingPanel(xCenter, side) {
     const g = new THREE.Group();
     const isShop = Math.random() < 0.65;
     const height = isShop
-        ? 2.2 + Math.random() * 2.0          // shops:  2.2 – 4.2
-        : 3.5 + Math.random() * 4.5;         // buildings: 3.5 – 8.0
+        ? 2.5 + Math.random() * 2.5          // shops:  2.5 – 5.0
+        : 4.0 + Math.random() * 6.0;         // buildings: 4.0 – 10.0
     const depth  = 1.8 + Math.random() * 1.2; // how far from road (x)
     const color  = isShop ? pick(SHOP_COLORS) : pick(BUILDING_COLORS);
 
@@ -296,6 +326,66 @@ function makeBuildingPanel(xCenter, side) {
             (Math.random() - 0.5) * PANEL_Z * 0.6,
         );
         g.add(ac);
+    }
+
+    g.position.x = xCenter;
+    return g;
+}
+
+// =========================================================================
+//  Skyscraper factory — tall buildings behind the shopfronts
+// =========================================================================
+function makeSkyscraper(xCenter, side) {
+    const g = new THREE.Group();
+
+    // Main tower
+    const height = 15 + Math.random() * 35;
+    const width  = 3 + Math.random() * 4;
+    const depth  = 3 + Math.random() * 4;
+    const color  = pick(SKYSCRAPER_COLORS);
+    const mat    = new THREE.MeshPhongMaterial({ color });
+
+    const box = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), mat);
+    box.position.y = height / 2;
+    box.castShadow = true;
+    g.add(box);
+
+    // Top accent / roof structure
+    if (Math.random() < 0.6) {
+        const topH = 1.5 + Math.random() * 3;
+        const topMat = new THREE.MeshPhongMaterial({
+            color: pick([0xccddee, 0x445566, 0x99aabb, 0x667788]),
+        });
+        const top = new THREE.Mesh(
+            new THREE.BoxGeometry(width * 0.6, topH, depth * 0.6),
+            topMat,
+        );
+        top.position.y = height + topH / 2;
+        g.add(top);
+    }
+
+    // Window strips (horizontal bands of glass)
+    const winMat = new THREE.MeshPhongMaterial({
+        color: 0x88bbdd, transparent: true, opacity: 0.25,
+    });
+    const numStrips = Math.min(6, Math.floor(height / 7));
+    for (let i = 0; i < numStrips; i++) {
+        const strip = new THREE.Mesh(
+            new THREE.BoxGeometry(width + 0.05, 1.0, depth + 0.05),
+            winMat,
+        );
+        strip.position.y = 4 + i * ((height - 4) / Math.max(1, numStrips));
+        g.add(strip);
+    }
+
+    // Antenna on some tall buildings
+    if (height > 35 && Math.random() < 0.4) {
+        const antenna = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.05, 0.05, 4, 4),
+            new THREE.MeshPhongMaterial({ color: 0x888888 }),
+        );
+        antenna.position.y = height + 2;
+        g.add(antenna);
     }
 
     g.position.x = xCenter;

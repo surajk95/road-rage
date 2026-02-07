@@ -5,6 +5,7 @@ import { scene, camera, dirLight } from "./scene.js";
 import {
     LANE_LEFT, MIN_SPEED, MAX_SPEED, START_SPEED,
     ACCEL, BRAKE_DECEL, NATURAL_DECEL, LANE_SWITCH_SPEED,
+    VEHICLE_PHYSICS,
     laneX, pickRandom, formatDistance,
     POTHOLE_MSGS, POLICE_MSGS, TRAFFIC_MSGS, COW_MSGS, WRONGWAY_MSGS,
 } from "./config.js";
@@ -99,22 +100,25 @@ export function backToMenu() {
 export function update(rawDelta, keys) {
     const delta = Math.min(rawDelta, 0.05); // clamp for tab-switch safety
 
-    // ---- Read input (A/D swapped to match screen direction) ----
+    // ---- Read input ----
     const accel   = keys.ArrowUp    || keys.KeyW;
     const brake   = keys.ArrowDown  || keys.KeyS;
-    const goLeft  = keys.ArrowLeft  || keys.KeyD;
-    const goRight = keys.ArrowRight || keys.KeyA;
+    const goLeft  = keys.ArrowLeft  || keys.KeyA;
+    const goRight = keys.ArrowRight || keys.KeyD;
     const honk    = keys.Space;
+
+    // ---- Per-vehicle physics ----
+    const phys = VEHICLE_PHYSICS[state.vehicleType];
 
     // ---- Speed ----
     if (accel) {
-        state.playerSpeed = Math.min(MAX_SPEED, state.playerSpeed + ACCEL * delta);
+        state.playerSpeed = Math.min(phys.maxSpeed, state.playerSpeed + phys.accel * delta);
     } else if (brake) {
-        state.playerSpeed = Math.max(MIN_SPEED * 0.5, state.playerSpeed - BRAKE_DECEL * delta);
+        state.playerSpeed = Math.max(MIN_SPEED * 0.5, state.playerSpeed - phys.brakeDecel * delta);
     } else {
-        const cruise = MIN_SPEED + (MAX_SPEED - MIN_SPEED) * 0.3;
-        if (state.playerSpeed > cruise)   state.playerSpeed -= NATURAL_DECEL * delta;
-        else if (state.playerSpeed < MIN_SPEED) state.playerSpeed += ACCEL * 0.5 * delta;
+        const cruise = MIN_SPEED + (phys.maxSpeed - MIN_SPEED) * 0.3;
+        if (state.playerSpeed > cruise)   state.playerSpeed -= phys.naturalDecel * delta;
+        else if (state.playerSpeed < MIN_SPEED) state.playerSpeed += phys.accel * 0.5 * delta;
     }
 
     // ---- Forward movement ----
@@ -123,19 +127,20 @@ export function update(rawDelta, keys) {
     state.distance += dz;
 
     // ---- Lane switching ----
-    if (goLeft)  state.playerLane = 0;
-    if (goRight) state.playerLane = 1;
+    // Only switch lane if one key is pressed (not both)
+    if (goLeft && !goRight)  state.playerLane = 1;  // lane 1 = right (+1.3)
+    if (goRight && !goLeft) state.playerLane = 0;  // lane 0 = left (-1.3)
 
     const targetX = laneX(state.playerLane);
     const prevX   = state.playerMesh.position.x;
-    state.playerMesh.position.x += (targetX - prevX) * LANE_SWITCH_SPEED * delta;
+    state.playerMesh.position.x += (targetX - prevX) * phys.laneSwitchSpeed * delta;
     state.playerMesh.position.z  = state.playerZ;
 
     // ---- Vehicle tilt on lane change ----
     state.playerMesh.rotation.z = -(state.playerMesh.position.x - prevX) * 2.5;
 
     // ---- Road vibration & bumps (feel the Indian road) ----
-    const speedNorm = state.playerSpeed / MAX_SPEED;
+    const speedNorm = state.playerSpeed / phys.maxSpeed;
     const pz = state.playerZ;
     const bumpAmp = 0.02 + speedNorm * 0.04;
     const bump = Math.sin(pz * 2.3) * bumpAmp
