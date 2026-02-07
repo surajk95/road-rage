@@ -188,7 +188,8 @@ export function update(rawDelta, keys) {
     dirLight.target.updateMatrixWorld();
 
     // ---- HUD ----
-    $speed.textContent    = Math.floor(state.playerSpeed * 3.6) + " km/h";
+    const speedKmh = Math.floor(state.playerSpeed * 3.6);
+    $speed.innerHTML = `${speedKmh}<span class="gauge-unit">km/h</span>`;
     $distance.textContent = formatDistance(state.distance);
 }
 
@@ -243,6 +244,6 @@ function triggerGameOver(obstacle) {
 // =========================================================================
 function refreshHighScoreHUD() {
     $highscore.textContent = state.highScore > 0
-        ? "Best: " + formatDistance(state.highScore)
-        : "";
+        ? formatDistance(state.highScore)
+        : "---";
 }

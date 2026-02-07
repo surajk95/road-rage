@@ -42,21 +42,103 @@ body { overflow: hidden; background: #000; font-family: 'Trebuchet MS', 'Segoe U
 }
 .controls-info span { font-weight: bold; }
 
-/* ===== HUD ===== */
+/* ===== Dashboard (3D skewed HUD) ===== */
 #hud {
-    position: fixed; top: 0; left: 0; width: 100%; padding: 1rem 1.5rem;
-    display: flex; justify-content: space-between; align-items: flex-start;
+    position: fixed; bottom: 0; left: 0; width: 100%; height: 200px;
     z-index: 50; pointer-events: none;
+    display: flex; align-items: flex-end; justify-content: center;
+    perspective: 800px;
 }
 #hud.hidden { display: none; }
-.hud-item {
-    color: #fff; font-size: 1.2rem; font-weight: 700;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
-    background: rgba(0,0,0,0.3); padding: 0.4rem 0.8rem; border-radius: 8px;
+
+.dashboard {
+    width: 90%; max-width: 900px; height: 140px;
+    background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+    border: 3px solid #333;
+    border-bottom: none;
+    border-radius: 20px 20px 0 0;
+    transform: rotateX(25deg) translateZ(-20px);
+    transform-style: preserve-3d;
+    box-shadow: 
+        inset 0 4px 8px rgba(255,255,255,0.05),
+        inset 0 -4px 8px rgba(0,0,0,0.5),
+        0 -10px 30px rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 1rem 2rem;
+    position: relative;
 }
-#speed-display    { font-size: 1.5rem; }
-#distance-display { font-size: 1.1rem; }
-#highscore-display { font-size: 0.9rem; opacity: 0.8; }
+
+.dashboard::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(255,255,255,0.02) 50%, 
+        transparent 100%);
+    pointer-events: none;
+}
+
+.gauge-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.gauge-label {
+    font-size: 0.65rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+}
+
+.gauge-value {
+    font-family: 'Courier New', monospace;
+    font-size: 2.8rem;
+    font-weight: 700;
+    color: #00ff88;
+    text-shadow: 
+        0 0 10px rgba(0,255,136,0.6),
+        0 0 20px rgba(0,255,136,0.3),
+        2px 2px 4px rgba(0,0,0,0.8);
+    line-height: 1;
+    min-width: 150px;
+    text-align: center;
+}
+
+.gauge-unit {
+    font-size: 1rem;
+    margin-left: 0.3rem;
+    color: #00cc66;
+}
+
+.odometer-value {
+    font-size: 1.8rem;
+    color: #4FC3F7;
+    text-shadow: 
+        0 0 8px rgba(79,195,247,0.5),
+        0 0 16px rgba(79,195,247,0.2),
+        2px 2px 4px rgba(0,0,0,0.8);
+}
+
+.best-value {
+    font-size: 1.3rem;
+    color: #FFD166;
+    text-shadow: 
+        0 0 8px rgba(255,209,102,0.4),
+        0 0 16px rgba(255,209,102,0.2),
+        2px 2px 4px rgba(0,0,0,0.8);
+}
+
+.divider {
+    width: 2px;
+    height: 80px;
+    background: linear-gradient(180deg, transparent, #333 20%, #333 80%, transparent);
+}
 
 /* ===== Game Over ===== */
 #gameover {
@@ -128,13 +210,33 @@ canvas { display: block; }
     </div>
 </div>
 
-<!-- ============ HUD ============ -->
+<!-- ============ Dashboard HUD ============ -->
 <div id="hud" class="hidden">
-    <div>
-        <div class="hud-item" id="speed-display">0 km/h</div>
-        <div class="hud-item" id="highscore-display" style="margin-top:4px;"></div>
+    <div class="dashboard">
+        <!-- Speedometer -->
+        <div class="gauge-container">
+            <div class="gauge-label">Speed</div>
+            <div class="gauge-value" id="speed-display">
+                0<span class="gauge-unit">km/h</span>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Odometer -->
+        <div class="gauge-container">
+            <div class="gauge-label">Distance</div>
+            <div class="gauge-value odometer-value" id="distance-display">0 m</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Best/High Score -->
+        <div class="gauge-container">
+            <div class="gauge-label">Best</div>
+            <div class="gauge-value best-value" id="highscore-display">---</div>
+        </div>
     </div>
-    <div class="hud-item" id="distance-display">0 m</div>
 </div>
 
 <!-- ============ Warning ============ -->
