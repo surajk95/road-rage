@@ -422,29 +422,38 @@ function _buildCalf() {
 export function createPothole() {
     const g = new THREE.Group();
 
-    // dark crater
+    // light brown/tan earth crater (exposed ground - much lighter)
     const crater = new THREE.Mesh(
         new THREE.CircleGeometry(0.7, 12),
-        new THREE.MeshLambertMaterial({ color: 0x0a0a0a }),
+        new THREE.MeshLambertMaterial({ color: 0xa1887f }),
     );
     crater.rotation.x = -Math.PI / 2;
     crater.position.y = 0.015;
     g.add(crater);
 
-    // cracked edge
+    // medium brown inner hole
+    const innerHole = new THREE.Mesh(
+        new THREE.CircleGeometry(0.4, 10),
+        new THREE.MeshLambertMaterial({ color: 0x795548 }),
+    );
+    innerHole.rotation.x = -Math.PI / 2;
+    innerHole.position.y = 0.018;
+    g.add(innerHole);
+
+    // cracked asphalt edge
     const edge = new THREE.Mesh(
         new THREE.RingGeometry(0.6, 0.9, 12),
-        new THREE.MeshLambertMaterial({ color: 0x1a1a1a }),
+        new THREE.MeshLambertMaterial({ color: 0x2a2a2a }),
     );
     edge.rotation.x = -Math.PI / 2;
     edge.position.y = 0.012;
     g.add(edge);
 
-    // rubble bits
+    // dirt/gravel rubble bits (light brown/tan)
     for (let i = 0; i < 5; i++) {
         const bit = new THREE.Mesh(
             new THREE.BoxGeometry(0.08, 0.04, 0.08),
-            new THREE.MeshLambertMaterial({ color: 0x333333 }),
+            new THREE.MeshLambertMaterial({ color: 0x8d6e63 }),
         );
         const angle = Math.random() * Math.PI * 2;
         const dist  = 0.3 + Math.random() * 0.3;
@@ -452,6 +461,76 @@ export function createPothole() {
         bit.rotation.y = Math.random() * Math.PI;
         g.add(bit);
     }
+
+    // broken asphalt chunks (dark grey)
+    for (let i = 0; i < 3; i++) {
+        const chunk = new THREE.Mesh(
+            new THREE.BoxGeometry(0.12, 0.03, 0.1),
+            new THREE.MeshLambertMaterial({ color: 0x1a1a1a }),
+        );
+        const angle = Math.random() * Math.PI * 2;
+        const dist  = 0.5 + Math.random() * 0.25;
+        chunk.position.set(Math.cos(angle) * dist, 0.015, Math.sin(angle) * dist);
+        chunk.rotation.y = Math.random() * Math.PI;
+        g.add(chunk);
+    }
+
+    return g;
+}
+
+export function createRoughPatch() {
+    const g = new THREE.Group();
+
+    // rough patch base (light brown/tan weathered road) - much longer stretches
+    const patchWidth = 1.8 + Math.random() * 0.8;
+    const patchLength = 8 + Math.random() * 12; // 8-20 meters long
+    
+    const base = new THREE.Mesh(
+        new THREE.PlaneGeometry(patchWidth, patchLength),
+        new THREE.MeshLambertMaterial({ color: 0x9e9e9e }),
+    );
+    base.rotation.x = -Math.PI / 2;
+    base.position.y = 0.01;
+    g.add(base);
+
+    // rough texture with random bumps (light brown tones)
+    const bumpCount = 8 + Math.floor(Math.random() * 8);
+    for (let i = 0; i < bumpCount; i++) {
+        const bump = new THREE.Mesh(
+            new THREE.BoxGeometry(
+                0.15 + Math.random() * 0.25,
+                0.02 + Math.random() * 0.03,
+                0.15 + Math.random() * 0.25,
+            ),
+            new THREE.MeshLambertMaterial({ 
+                color: Math.random() < 0.5 ? 0xa1887f : 0xbcaaa4,
+            }),
+        );
+        bump.position.set(
+            (Math.random() - 0.5) * patchWidth * 0.8,
+            0.015 + Math.random() * 0.01,
+            (Math.random() - 0.5) * patchLength * 0.8,
+        );
+        bump.rotation.y = Math.random() * Math.PI;
+        g.add(bump);
+    }
+
+    // cracks (thin dark lines)
+    for (let i = 0; i < 3; i++) {
+        const crack = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.04, 0.8 + Math.random() * 1.5),
+            new THREE.MeshLambertMaterial({ color: 0x4a4a4a }),
+        );
+        crack.rotation.x = -Math.PI / 2;
+        crack.rotation.z = Math.random() * Math.PI;
+        crack.position.set(
+            (Math.random() - 0.5) * patchWidth * 0.6,
+            0.012,
+            (Math.random() - 0.5) * patchLength * 0.6,
+        );
+        g.add(crack);
+    }
+
     return g;
 }
 

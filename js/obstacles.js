@@ -9,7 +9,7 @@ import {
 } from "./config.js";
 import {
     createAutoRickshaw, createTruck, createCar,
-    createBus, createCow, createPothole, createPolice,
+    createBus, createCow, createPothole, createPolice, createRoughPatch,
 } from "./vehicles.js";
 
 // ----- Live obstacle list (exported for menu animation in main.js) -----
@@ -114,6 +114,10 @@ function spawnObstacle(type, lane, z) {
             mesh = createPothole();
             hitbox = HITBOXES.pothole;
             break;
+        case "roughpatch":
+            mesh = createRoughPatch();
+            hitbox = HITBOXES.roughpatch;
+            break;
         case "cow":
             mesh = createCow();
             hitbox = HITBOXES.cow;
@@ -194,40 +198,68 @@ export function manageSpawning(playerZ, distance) {
         const lane = Math.random() < 0.5 ? 0 : 1;
         const diff = Math.min(distance / 1000, 1);
 
-        if (rand < 0.08) {
-            spawnObstacle("pothole", lane, nextSpawnZ);
-        } else if (rand < 0.28) {
-            spawnObstacle("auto", lane, nextSpawnZ);
-        } else if (rand < 0.44) {
-            spawnObstacle("car", lane, nextSpawnZ);
-        } else if (rand < 0.56) {
-            spawnObstacle("truck", lane, nextSpawnZ);
+        let obstacleType = null;
+        let isGameOver = false; // tracks if obstacle causes game over
+
+        if (rand < 0.04) {
+            obstacleType = "pothole";
+            isGameOver = true;
+        } else if (rand < 0.40) {
+            // Way more frequent rough patches (36% spawn rate)
+            obstacleType = "roughpatch";
+            isGameOver = false;
+        } else if (rand < 0.52) {
+            obstacleType = "auto";
+            isGameOver = true;
         } else if (rand < 0.64) {
-            spawnObstacle("bus", lane, nextSpawnZ);
-        } else if (rand < 0.70) {
-            spawnObstacle("cow", lane, nextSpawnZ);
-        } else if (rand < 0.70 + 0.12 * diff && distance > 150) {
-            spawnObstacle("police", lane, nextSpawnZ);
-        } else if (rand < 0.70 + 0.12 * diff + 0.08 * diff && distance > 400) {
-            spawnObstacle("wrongway", lane, nextSpawnZ);
+            obstacleType = "car";
+            isGameOver = true;
+        } else if (rand < 0.74) {
+            obstacleType = "truck";
+            isGameOver = true;
+        } else if (rand < 0.80) {
+            obstacleType = "bus";
+            isGameOver = true;
+        } else if (rand < 0.85) {
+            obstacleType = "cow";
+            isGameOver = true;
+        } else if (rand < 0.85 + 0.08 * diff && distance > 150) {
+            obstacleType = "police";
+            isGameOver = true;
+        } else if (rand < 0.85 + 0.08 * diff + 0.06 * diff && distance > 400) {
+            obstacleType = "wrongway";
+            isGameOver = true;
         } else {
             // Fill the rest with extra traffic (auto-heavy)
             const extras = ["auto", "auto", "car", "truck", "auto"];
-            spawnObstacle(
-                extras[Math.floor(Math.random() * extras.length)],
-                lane, nextSpawnZ,
-            );
+            obstacleType = extras[Math.floor(Math.random() * extras.length)];
+            isGameOver = true;
         }
 
+        spawnObstacle(obstacleType, lane, nextSpawnZ);
+
         // Frequently spawn in both lanes for heavier traffic
-        if (Math.random() < 0.35 && rand >= 0.08) {
+        // But NEVER block both lanes with game-over obstacles at the same Z position
+        if (Math.random() < 0.35 && rand >= 0.04) {
             const otherLane = lane === 0 ? 1 : 0;
-            const types = ["auto", "car", "truck", "auto", "auto", "bus"];
-            spawnObstacle(
-                types[Math.floor(Math.random() * types.length)],
-                otherLane,
-                nextSpawnZ + (Math.random() - 0.5) * 4,
-            );
+            
+            // If the first obstacle is game-over, second one MUST be passable (rough patch)
+            if (isGameOver) {
+                // Always spawn rough patch in other lane to ensure player has escape route
+                spawnObstacle("roughpatch", otherLane, nextSpawnZ + (Math.random() - 0.5) * 3);
+            } else {
+                // First obstacle is safe (rough patch), so we can spawn anything in other lane
+                if (Math.random() < 0.5) {
+                    spawnObstacle("roughpatch", otherLane, nextSpawnZ + (Math.random() - 0.5) * 3);
+                } else {
+                    const types = ["auto", "car", "truck", "auto", "auto", "bus"];
+                    spawnObstacle(
+                        types[Math.floor(Math.random() * types.length)],
+                        otherLane,
+                        nextSpawnZ + (Math.random() - 0.5) * 3,
+                    );
+                }
+            }
         }
 
         nextSpawnZ += getSpawnGap(distance);
@@ -374,6 +406,9 @@ export function checkCollisions(playerMesh, vehicleType) {
     const FAIRNESS = 0.85;
 
     for (const o of obstacles) {
+        // Skip rough patches - they're bumpy but not a collision
+        if (o.type === "roughpatch") continue;
+
         const ox = o.mesh.position.x;
         const oz = o.mesh.position.z;
         const ohb = o.hitbox;
@@ -389,6 +424,34 @@ export function checkCollisions(playerMesh, vehicleType) {
 }
 
 // =========================================================================
+//  Check if player is on a rough patch (for bumpy effects)
+// =========================================================================
+export function isOnRoughPatch(playerMesh, vehicleType) {
+    if (!playerMesh) return false;
+
+    const px = playerMesh.position.x;
+    const pz = playerMesh.position.z;
+    const phb = HITBOXES[vehicleType];
+
+    for (const o of obstacles) {
+        if (o.type !== "roughpatch") continue;
+
+        const ox = o.mesh.position.x;
+        const oz = o.mesh.position.z;
+        const ohb = o.hitbox;
+
+        // Use larger detection area for rough patch effect
+        if (
+            Math.abs(px - ox) < (phb.width + ohb.width) * 0.5 &&
+            Math.abs(pz - oz) < (phb.length + ohb.length) * 0.5
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// =========================================================================
 //  Menu-screen decoration traffic
 // =========================================================================
 export function createMenuTraffic() {
@@ -398,7 +461,10 @@ export function createMenuTraffic() {
         const lane = Math.random() < 0.5 ? 0 : 1;
         spawnObstacle(type, lane, 10 + i * 20 + Math.random() * 10);
     }
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
         spawnObstacle("pothole", Math.random() < 0.5 ? 0 : 1, 15 + i * 30);
+    }
+    for (let i = 0; i < 2; i++) {
+        spawnObstacle("roughpatch", Math.random() < 0.5 ? 0 : 1, 25 + i * 35);
     }
 }

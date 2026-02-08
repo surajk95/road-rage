@@ -13,7 +13,7 @@ import { createAutoRickshaw, createScooty } from "./vehicles.js";
 import {
     obstacles, manageSpawning, updateObstacles,
     checkCollisions, clearObstacles, honkNearby,
-    resetSpawning, createMenuTraffic,
+    resetSpawning, createMenuTraffic, isOnRoughPatch,
 } from "./obstacles.js";
 import { updateRoadElements } from "./road.js";
 
@@ -142,13 +142,21 @@ export function update(rawDelta, keys) {
     // ---- Road vibration & bumps (feel the Indian road) ----
     const speedNorm = state.playerSpeed / phys.maxSpeed;
     const pz = state.playerZ;
-    const bumpAmp = 0.02 + speedNorm * 0.04;
+    let bumpAmp = 0.02 + speedNorm * 0.04;
+    
+    // Check if on rough patch - extra bumps!
+    const onRoughPatch = isOnRoughPatch(state.playerMesh, state.vehicleType);
+    if (onRoughPatch) {
+        bumpAmp *= 2.5; // Much bumpier on rough patches
+    }
+    
     const bump = Math.sin(pz * 2.3) * bumpAmp
                + Math.sin(pz * 5.7) * bumpAmp * 0.35
-               + Math.sin(pz * 0.7) * bumpAmp * 0.6;
+               + Math.sin(pz * 0.7) * bumpAmp * 0.6
+               + (onRoughPatch ? Math.sin(pz * 12.5) * bumpAmp * 0.5 : 0); // extra high-frequency bumps
     state.playerMesh.position.y = bump;
-    // subtle forward pitch wobble
-    state.playerMesh.rotation.x = Math.sin(pz * 3.1) * 0.02 * speedNorm;
+    // subtle forward pitch wobble (more intense on rough patches)
+    state.playerMesh.rotation.x = Math.sin(pz * 3.1) * 0.02 * speedNorm * (onRoughPatch ? 1.8 : 1);
 
     // ---- Honk ----
     if (honk) doHonk();
@@ -171,11 +179,13 @@ export function update(rawDelta, keys) {
     camera.position.z  = state.playerZ - 5.5;
     camera.lookAt(state.playerMesh.position.x * 0.6, 0.5, state.playerZ + 12);
 
-    // Camera shake / vibration — scales with speed
-    const shakeAmp = 0.012 + speedNorm * 0.05;
+    // Camera shake / vibration — scales with speed (extra intense on rough patches)
+    let shakeAmp = 0.012 + speedNorm * 0.05;
+    if (onRoughPatch) shakeAmp *= 2.0;
     camera.position.x += Math.sin(pz * 7.3)  * shakeAmp * 0.5;
     camera.position.y += Math.sin(pz * 11.1) * shakeAmp * 0.25
-                       + Math.sin(pz * 5.7)  * shakeAmp * 0.15;
+                       + Math.sin(pz * 5.7)  * shakeAmp * 0.15
+                       + (onRoughPatch ? Math.sin(pz * 15.3) * shakeAmp * 0.3 : 0);
 
     // Dynamic FOV — tight at low speed, wide at high speed
     const targetFov = 58 + speedNorm * 30;

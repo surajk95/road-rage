@@ -45,15 +45,16 @@ export const DESPAWN_BEHIND = 40;
 
 // ----- Hitboxes (width × length in game-units) -----
 export const HITBOXES = {
-    auto:     { width: 1.3, length: 2.0 },
-    scooty:   { width: 0.5, length: 1.4 },
-    truck:    { width: 2.0, length: 5.5 },
-    car:      { width: 1.6, length: 3.2 },
-    bus:      { width: 2.1, length: 5.5 },
-    cow:      { width: 1.8, length: 2.0 },
-    pothole:  { width: 1.2, length: 1.2 },
-    police:   { width: 1.2, length: 0.8 },
-    wrongway: { width: 1.6, length: 3.2 },
+    auto:       { width: 1.3, length: 2.0 },
+    scooty:     { width: 0.5, length: 1.4 },
+    truck:      { width: 2.0, length: 5.5 },
+    car:        { width: 1.6, length: 3.2 },
+    bus:        { width: 2.1, length: 5.5 },
+    cow:        { width: 1.8, length: 2.0 },
+    pothole:    { width: 1.2, length: 1.2 },
+    police:     { width: 1.2, length: 0.8 },
+    wrongway:   { width: 1.6, length: 3.2 },
+    roughpatch: { width: 2.5, length: 15.0 },
 };
 
 // ----- Game-over messages by obstacle type -----
