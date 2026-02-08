@@ -289,7 +289,8 @@ function checkNPCCollisions(playerZ) {
             if (toRemove.has(b)) continue;
             // Skip if still in spawn grace period
             if (b.spawnGrace > 0) continue;
-            // Allow collision if either a or b is moving (a is already moving from above check)
+            // Skip rough patches - NPCs can drive over them just like the player
+            if (b.type === "roughpatch") continue;
 
             const dx = Math.abs(a.mesh.position.x - b.mesh.position.x);
             const dz = Math.abs(a.mesh.position.z - b.mesh.position.z);
