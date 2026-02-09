@@ -7,7 +7,8 @@ import {
     ACCEL, BRAKE_DECEL, NATURAL_DECEL, LANE_SWITCH_SPEED,
     VEHICLE_PHYSICS,
     laneX, pickRandom, formatDistance,
-    POTHOLE_MSGS, POLICE_MSGS, TRAFFIC_MSGS, COW_MSGS, WRONGWAY_MSGS,
+    POTHOLE_MSGS, POLICE_MSGS, TRAFFIC_MSGS, COW_MSGS, DOG_MSGS, WRONGWAY_MSGS,
+    SPEECH_BUBBLES,
 } from "./config.js";
 import { createAutoRickshaw, createScooty } from "./vehicles.js";
 import {
@@ -47,6 +48,7 @@ const $goMessage  = document.getElementById("gameover-message");
 const $goDist     = document.getElementById("go-dist");
 const $goHS       = document.getElementById("gameover-highscore");
 const $warning    = document.getElementById("warning");
+const $speechBubbles = document.getElementById("speech-bubbles");
 
 // =========================================================================
 //  Start / restart / back-to-menu
@@ -62,6 +64,11 @@ export function startGame(type) {
 
     clearObstacles();
     resetSpawning(50);
+    spokenObstacles.clear(); // clear speech bubble tracking
+    
+    // Clear active bubbles
+    activeBubbles.forEach(b => b.remove());
+    activeBubbles.length = 0;
 
     // Create player vehicle
     if (state.playerMesh) scene.remove(state.playerMesh);
@@ -169,6 +176,65 @@ export function update(rawDelta, keys) {
     const hit = checkCollisions(state.playerMesh, state.vehicleType);
     if (hit) { triggerGameOver(hit); return; }
 
+    // ---- Speech Bubbles (when passing obstacles) ----
+    for (const o of obstacles) {
+        // Only show speech for obstacles close to player and not already spoken
+        const relativeZ = o.mesh.position.z - state.playerZ;
+        
+        // Trigger when obstacle is ahead (4-12 units) - appear a bit earlier
+        if (relativeZ > 4 && relativeZ < 12 && !spokenObstacles.has(o)) {
+            // Check if obstacle has speech bubbles
+            if (SPEECH_BUBBLES[o.type]) {
+                const bubble = showSpeechBubble(o);
+                if (bubble) {
+                    activeBubbles.push(bubble);
+                }
+                spokenObstacles.add(o);
+            }
+        }
+        
+        // Clean up spoken obstacles that are far behind
+        if (relativeZ < -30) {
+            spokenObstacles.delete(o);
+        }
+    }
+
+    // ---- Update Speech Bubble Positions ----
+    for (let i = activeBubbles.length - 1; i >= 0; i--) {
+        const bubble = activeBubbles[i];
+        const { obstacle, startTime } = bubble.userData;
+        
+        // Check if bubble has expired (600ms)
+        const elapsed = Date.now() - startTime;
+        if (elapsed > 600) {
+            bubble.classList.add("fade-out");
+            setTimeout(() => bubble.remove(), 300);
+            activeBubbles.splice(i, 1);
+            continue;
+        }
+        
+        // Convert obstacle 3D position to screen position
+        const position = obstacle.mesh.position.clone();
+        position.y += 1.5; // Position bubble above obstacle
+        position.project(camera);
+        
+        // Convert to screen coordinates
+        const screenX = (position.x * 0.5 + 0.5) * window.innerWidth;
+        const screenY = (-(position.y * 0.5) + 0.5) * window.innerHeight;
+        
+        // Check if on screen
+        if (position.z < 1 && screenX >= 0 && screenX <= window.innerWidth && 
+            screenY >= 0 && screenY <= window.innerHeight) {
+            bubble.style.left = `${screenX}px`;
+            bubble.style.top = `${screenY}px`;
+            bubble.style.transform = "translateX(-50%)";
+            bubble.style.display = "block";
+        } else {
+            // Hide if off screen
+            bubble.style.display = "none";
+        }
+    }
+
     // ---- Road ----
     updateRoadElements(state.playerZ);
 
@@ -220,12 +286,41 @@ function doHonk() {
 }
 
 // =========================================================================
+//  Speech Bubbles
+// =========================================================================
+function showSpeechBubble(obstacle) {
+    // Get dialogue for this obstacle type
+    const dialogues = SPEECH_BUBBLES[obstacle.type];
+    if (!dialogues) return;
+
+    const text = pickRandom(dialogues);
+    
+    const bubble = document.createElement("div");
+    bubble.className = "speech-bubble";
+    bubble.textContent = text;
+    
+    // Store reference to obstacle and camera for positioning
+    bubble.userData = { obstacle, startTime: Date.now() };
+    
+    $speechBubbles.appendChild(bubble);
+    
+    return bubble;
+}
+
+// Track active speech bubbles
+const activeBubbles = [];
+
+// Track which obstacles have already spoken
+const spokenObstacles = new Set();
+
+// =========================================================================
 //  Game over
 // =========================================================================
 const MESSAGES_BY_TYPE = {
     pothole:  { msgs: POTHOLE_MSGS,  reason: "You hit a pothole!" },
     police:   { msgs: POLICE_MSGS,   reason: "Caught by Traffic Police!" },
     cow:      { msgs: COW_MSGS,      reason: "You hit a cow!" },
+    dog:      { msgs: DOG_MSGS,      reason: "You hit a street dog!" },
     wrongway: { msgs: WRONGWAY_MSGS, reason: "Head-on collision!" },
 };
 

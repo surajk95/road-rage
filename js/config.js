@@ -51,6 +51,7 @@ export const HITBOXES = {
     car:        { width: 1.6, length: 3.2 },
     bus:        { width: 2.1, length: 5.5 },
     cow:        { width: 1.8, length: 2.0 },
+    dog:        { width: 0.5, length: 0.8 },
     pothole:    { width: 1.2, length: 1.2 },
     police:     { width: 1.2, length: 0.8 },
     wrongway:   { width: 1.6, length: 3.2 },
@@ -114,6 +115,17 @@ export const COW_MSGS = [
     "Moo means 'get out of MY lane'",
 ];
 
+export const DOG_MSGS = [
+    "That's one way to stop a street dog!",
+    "The dog had zero road sense. You had zero brakes.",
+    "Street dogs: 0 traffic rules, 100% confidence",
+    "Should've honked! Dogs actually move for horns!",
+    "That dog crossed the road to see what's on the other side...",
+    "Man's best friend. Road's worst enemy.",
+    "The dog was just looking for food scraps. Found you instead.",
+    "Every street dog thinks it owns the road. This one learned otherwise.",
+];
+
 export const WRONGWAY_MSGS = [
     "Head-on collision! Should've honked louder!",
     "They were on the wrong side. Or were you?",
@@ -121,6 +133,18 @@ export const WRONGWAY_MSGS = [
     "Wrong side? Both sides are wrong in India!",
     "That was a very confident wrong-side driver!",
 ];
+
+// ----- Speech Bubble Dialogues (when passing obstacles) -----
+export const SPEECH_BUBBLES = {
+    cow: ["MOOO!", "Moo moo!", "MOOOOO!", "Moo?"],
+    dog: ["WOOF!", "Bark bark!", "WOOF WOOF!", "Arf arf!", "Bhow bhow!"],
+    police: ["Mind it!", "Challan!", "Stop!", "License dikhaao!", "Helmet kahaan hai?", "Slow down!"],
+    auto: ["PEEP PEEP!", "Beep!", "PEE PEE PEE!", "Move it!", "Side bc!", "^&#@"],
+    car: ["HONK!", "Beep beep!", "Move!", "Oi!", "Watch it!"],
+    truck: ["HORN OK PLEASE!", "Beep beep!", "Out of my way!", "HONK!", "Side do bhai!"],
+    bus: ["PEEEEP!", "Move aside!", "Beep beep!", "Bus coming!", "Side please!"],
+    wrongway: ["Wrong side!", "Arre!", "Watch it!", "Oye!", "Bachke!"],
+};
 
 // ----- Helpers -----
 export function laneX(lane) {

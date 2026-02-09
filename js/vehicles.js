@@ -534,6 +534,78 @@ export function createRoughPatch() {
     return g;
 }
 
+export function createDog() {
+    const g = new THREE.Group();
+    
+    // Random dog colors (brown, black, white, tan, spotted)
+    const dogColors = [0x8d6e63, 0x3e2723, 0xf5f5dc, 0xd7a86e, 0xa1887f];
+    const dogColor = dogColors[Math.floor(Math.random() * dogColors.length)];
+    const bodyMat = new THREE.MeshPhongMaterial({ color: dogColor });
+    const blkMat = new THREE.MeshPhongMaterial({ color: 0x111111 });
+
+    // Body (elongated)
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.35, 0.7), bodyMat);
+    body.position.set(0, 0.25, 0);
+    body.castShadow = true;
+    g.add(body);
+
+    // Legs (4)
+    for (const [x, z] of [[-0.15, 0.25], [0.15, 0.25], [-0.15, -0.25], [0.15, -0.25]]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.22, 0.1), bodyMat);
+        leg.position.set(x, 0.11, z);
+        g.add(leg);
+    }
+
+    // Head
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.25, 0.3), bodyMat);
+    head.position.set(0, 0.32, 0.5);
+    g.add(head);
+
+    // Snout
+    const snout = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.15, 0.15), bodyMat);
+    snout.position.set(0, 0.28, 0.7);
+    g.add(snout);
+
+    // Nose
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), blkMat);
+    nose.position.set(0, 0.28, 0.78);
+    g.add(nose);
+
+    // Eyes
+    for (const x of [-0.08, 0.08]) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 6), blkMat);
+        eye.position.set(x, 0.38, 0.62);
+        g.add(eye);
+    }
+
+    // Ears (floppy)
+    for (const x of [-0.12, 0.12]) {
+        const ear = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.15, 0.05), bodyMat);
+        ear.position.set(x, 0.42, 0.45);
+        ear.rotation.z = x > 0 ? -0.3 : 0.3;
+        g.add(ear);
+    }
+
+    // Tail (wagging up)
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.25), bodyMat);
+    tail.position.set(0, 0.35, -0.45);
+    tail.rotation.x = -0.5;
+    g.add(tail);
+
+    // Optional collar (50% chance)
+    if (Math.random() < 0.5) {
+        const collar = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.16, 0.16, 0.04, 8),
+            new THREE.MeshPhongMaterial({ color: Math.random() < 0.5 ? 0xff0000 : 0x0000ff }),
+        );
+        collar.position.set(0, 0.3, 0.48);
+        collar.rotation.x = Math.PI / 2;
+        g.add(collar);
+    }
+
+    return g;
+}
+
 export function createPolice() {
     const g        = new THREE.Group();
     const khaki    = new THREE.MeshPhongMaterial({ color: 0xc3a86b });

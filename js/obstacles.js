@@ -9,7 +9,7 @@ import {
 } from "./config.js";
 import {
     createAutoRickshaw, createTruck, createCar,
-    createBus, createCow, createPothole, createPolice, createRoughPatch,
+    createBus, createCow, createDog, createPothole, createPolice, createRoughPatch,
 } from "./vehicles.js";
 
 // ----- Live obstacle list (exported for menu animation in main.js) -----
@@ -122,6 +122,12 @@ function spawnObstacle(type, lane, z) {
             mesh = createCow();
             hitbox = HITBOXES.cow;
             break;
+        case "dog":
+            mesh = createDog();
+            hitbox = HITBOXES.dog;
+            // Dogs face random direction (some cross, some stand)
+            mesh.rotation.y = Math.random() * Math.PI * 2;
+            break;
         case "police":
             mesh = createPolice();
             hitbox = HITBOXES.police;
@@ -159,20 +165,39 @@ function spawnObstacle(type, lane, z) {
             break;
     }
 
-    mesh.position.set(laneX(lane), 0, z);
+    // Dogs always cross the road (100% crossing)
+    const isDogCrossing = type === "dog";
+    
+    // For dogs, ALWAYS spawn them at the road edge (outside the lane)
+    let spawnX;
+    let dogStartSide; // which side of road dog starts from
+    if (type === "dog") {
+        // Randomly pick which side to start from
+        dogStartSide = Math.random() < 0.5 ? 'left' : 'right';
+        spawnX = dogStartSide === 'left' ? -3.0 : 3.0; // well outside the road
+    } else {
+        spawnX = laneX(lane); // normal lane position
+        dogStartSide = null;
+    }
+    
+    mesh.position.set(spawnX, 0, z);
     scene.add(mesh);
-
+    
     obstacles.push({
         type, mesh, hitbox, speed,
-        lane, targetLane: lane,
-        canChangeLane,
+        lane, 
+        targetLane: lane, // not used for crossing dogs
+        canChangeLane: false, // dogs don't use normal lane change logic
         laneChangeTimer:
             type === "auto"
                 ? 0.5 + Math.random() * 1.5
                 : 2 + Math.random() * 4,
         speedChangeTimer: 3 + Math.random() * 5,
         erratic: type === "auto" || Math.random() < 0.3,
-        spawnGrace: 1.5,
+        spawnGrace: 0.3, // shorter grace for dogs
+        isCrossing: isDogCrossing,
+        hasCrossed: false, // track if dog has completed crossing
+        dogStartSide: dogStartSide, // track which side dog started from
     });
 }
 
@@ -185,12 +210,19 @@ function getSpawnGap(distance) {
 }
 
 export function manageSpawning(playerZ, distance) {
-    // Ensure minimum 2-3 cow groups on road at all times
+    // Ensure minimum 1-2 cow groups on road at all times (less frequent)
     const cowCount = obstacles.filter((o) => o.type === "cow").length;
-    if (cowCount < 2) {
+    if (cowCount < 1) {
         const lane = Math.random() < 0.5 ? 0 : 1;
-        const z = playerZ + 50 + Math.random() * 100;
+        const z = playerZ + 60 + Math.random() * 120;
         spawnObstacle("cow", lane, z);
+    }
+
+    // Spawn dogs very close to player so they appear suddenly
+    if (Math.random() < 0.003) { // 0.3% chance per frame to spawn a crossing dog
+        const lane = Math.random() < 0.5 ? 0 : 1;
+        const z = playerZ + 10 + Math.random() * 15; // spawn very close (10-25 units ahead)
+        spawnObstacle("dog", lane, z);
     }
 
     while (nextSpawnZ < playerZ + SPAWN_AHEAD) {
@@ -208,25 +240,25 @@ export function manageSpawning(playerZ, distance) {
             // Way more frequent rough patches (36% spawn rate)
             obstacleType = "roughpatch";
             isGameOver = false;
-        } else if (rand < 0.52) {
+        } else if (rand < 0.48) {
             obstacleType = "auto";
             isGameOver = true;
-        } else if (rand < 0.64) {
+        } else if (rand < 0.58) {
             obstacleType = "car";
             isGameOver = true;
-        } else if (rand < 0.74) {
+        } else if (rand < 0.68) {
             obstacleType = "truck";
             isGameOver = true;
-        } else if (rand < 0.80) {
+        } else if (rand < 0.74) {
             obstacleType = "bus";
             isGameOver = true;
-        } else if (rand < 0.85) {
+        } else if (rand < 0.81) {
             obstacleType = "cow";
             isGameOver = true;
-        } else if (rand < 0.85 + 0.08 * diff && distance > 150) {
+        } else if (rand < 0.81 + 0.08 * diff && distance > 150) {
             obstacleType = "police";
             isGameOver = true;
-        } else if (rand < 0.85 + 0.08 * diff + 0.06 * diff && distance > 400) {
+        } else if (rand < 0.84 + 0.08 * diff + 0.06 * diff && distance > 400) {
             obstacleType = "wrongway";
             isGameOver = true;
         } else {
@@ -333,12 +365,20 @@ export function updateObstacles(delta, playerZ) {
         if (o.speed !== 0) o.mesh.position.z += o.speed * delta;
 
         // Lane-change AI
-        if (o.canChangeLane) {
+        const isDog = o.type === "dog";
+        
+        // Dogs cross immediately without timer
+        if (isDog && o.isCrossing && !o.hasCrossed) {
+            // Dog is actively crossing - no timer needed
+            // (targetLane already set at spawn)
+        } else if (o.canChangeLane && !isDog) {
+            // Regular vehicle lane changing
             o.laneChangeTimer -= delta;
             if (o.laneChangeTimer <= 0) {
                 const isAuto = o.type === "auto";
                 if (isAuto || o.erratic || Math.random() < 0.4)
                     o.targetLane = o.targetLane === 0 ? 1 : 0;
+                
                 o.laneChangeTimer = isAuto
                     ? 0.5 + Math.random() * 1.5
                     : (o.erratic ? 1.5 : 3) + Math.random() * 3;
@@ -362,26 +402,65 @@ export function updateObstacles(delta, playerZ) {
         }
 
         // Smooth lane transition
-        const targetX = laneX(o.targetLane);
-        o.mesh.position.x += (targetX - o.mesh.position.x) * 3 * delta;
+        let targetX;
+        
+        // Dogs crossing - target WELL BEYOND the opposite road edge
+        if (isDog && o.isCrossing && !o.hasCrossed) {
+            // Cross to well past the opposite side of the road
+            targetX = o.dogStartSide === 'left' ? 3.5 : -3.5; // target beyond the road
+        } else {
+            targetX = laneX(o.targetLane);
+        }
+        
+        // Dogs move across lanes at moderate speed
+        const laneSpeed = isDog && o.isCrossing && !o.hasCrossed ? 4 : 3;
+        o.mesh.position.x += (targetX - o.mesh.position.x) * laneSpeed * delta;
+        
+        // Dogs run forward while crossing the road
+        if (isDog && o.isCrossing && !o.hasCrossed) {
+            const distanceToTarget = Math.abs(targetX - o.mesh.position.x);
+            
+            // Keep running until completely off the road
+            if (distanceToTarget > 0.1) {
+                const runSpeed = 7; // dog running speed forward (slower)
+                o.mesh.position.z += runSpeed * delta;
+                
+                // Point dog in direction of movement (diagonal across road)
+                const crossDirection = targetX > o.mesh.position.x ? 1 : -1;
+                o.mesh.rotation.y = crossDirection > 0 ? -Math.PI / 4 : Math.PI / 4;
+                
+                // Simple running animation - bob up and down
+                const bobSpeed = 16;
+                o.mesh.position.y = Math.abs(Math.sin((o.mesh.position.z + o.mesh.position.x) * bobSpeed)) * 0.08;
+            } else {
+                // Dog completely off the road - mark for removal
+                o.hasCrossed = true;
+                o.mesh.position.y = 0;
+            }
+        } else if (isDog && !o.isCrossing) {
+            // Standing dog - shouldn't happen anymore
+            o.mesh.position.y = 0;
+        }
+        
         o.lane =
             Math.abs(o.mesh.position.x - LANE_LEFT) <
             Math.abs(o.mesh.position.x - LANE_RIGHT)
                 ? 0
                 : 1;
 
-        // Tilt while changing lanes
+        // Tilt while changing lanes (vehicles only)
         const xDiff = targetX - o.mesh.position.x;
-        if (Math.abs(xDiff) > 0.1 && o.speed > 0) {
+        if (Math.abs(xDiff) > 0.1 && o.speed > 0 && !isDog) {
             o.mesh.rotation.z = -xDiff * 0.05;
-        } else {
+        } else if (!isDog) {
             o.mesh.rotation.z *= 0.9;
         }
 
-        // Despawn if far behind
+        // Despawn if far behind OR if dog has crossed and reached the edge
         if (
             o.mesh.position.z < playerZ - DESPAWN_BEHIND ||
-            (o.speed < 0 && o.mesh.position.z < playerZ - 50)
+            (o.speed < 0 && o.mesh.position.z < playerZ - 50) ||
+            (isDog && o.hasCrossed) // Remove dog after it crosses
         ) {
             scene.remove(o.mesh);
             obstacles.splice(i, 1);
@@ -456,7 +535,7 @@ export function isOnRoughPatch(playerMesh, vehicleType) {
 //  Menu-screen decoration traffic
 // =========================================================================
 export function createMenuTraffic() {
-    const types = ["truck", "car", "bus", "auto", "cow"];
+    const types = ["truck", "car", "bus", "auto", "cow", "dog"];
     for (let i = 0; i < 8; i++) {
         const type = types[Math.floor(Math.random() * types.length)];
         const lane = Math.random() < 0.5 ? 0 : 1;
@@ -468,4 +547,6 @@ export function createMenuTraffic() {
     for (let i = 0; i < 2; i++) {
         spawnObstacle("roughpatch", Math.random() < 0.5 ? 0 : 1, 25 + i * 35);
     }
+    // Add a crossing dog for menu
+    spawnObstacle("dog", Math.random() < 0.5 ? 0 : 1, 50);
 }
