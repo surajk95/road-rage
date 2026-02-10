@@ -1,8 +1,17 @@
 {
     "name": "road-rage",
+    "author": "surajk95",
     "version": "1.0.0",
     "private": true,
-    "description": "A 3D Indian traffic survival game — parody of Indian roads",
+    "description": "A 3D Indian traffic survival game",
+    "keywords": [
+        "3d",
+        "game",
+        "traffic",
+        "survival",
+        "indian",
+        "roads"
+    ],
     "scripts": {
         "dev": "npx serve ."
     }
