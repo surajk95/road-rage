@@ -32,6 +32,7 @@ export const state = {
     distance:   0,
     highScore:  parseInt(localStorage.getItem("roadrage_highscore") || "0", 10),
     honkCooldown: 0,
+    cameraMode: "third-person",  // "third-person" | "first-person"
 };
 
 // =========================================================================
@@ -113,6 +114,13 @@ export function update(rawDelta, keys) {
     const goLeft  = keys.ArrowLeft  || keys.KeyA;
     const goRight = keys.ArrowRight || keys.KeyD;
     const honk    = keys.Space;
+    
+    // ---- Camera toggle (V key) ----
+    if (keys.KeyV && !keys.KeyV_handled) {
+        state.cameraMode = state.cameraMode === "third-person" ? "first-person" : "third-person";
+        keys.KeyV_handled = true;
+    }
+    if (!keys.KeyV) keys.KeyV_handled = false;
 
     // ---- Per-vehicle physics ----
     const phys = VEHICLE_PHYSICS[state.vehicleType];
@@ -238,25 +246,48 @@ export function update(rawDelta, keys) {
     // ---- Road ----
     updateRoadElements(state.playerZ);
 
-    // ---- Camera (low & close for claustrophobic speed feel) ----
-    const camTargetX = state.playerMesh.position.x * 0.5;
-    camera.position.x += (camTargetX - camera.position.x) * 5 * delta;
-    camera.position.y  = 3.0;
-    camera.position.z  = state.playerZ - 5.5;
-    camera.lookAt(state.playerMesh.position.x * 0.6, 0.5, state.playerZ + 12);
+    // ---- Camera ----
+    if (state.cameraMode === "first-person") {
+        // First-person camera — inside the vehicle
+        const camTargetX = state.playerMesh.position.x;
+        camera.position.x += (camTargetX - camera.position.x) * 8 * delta;
+        camera.position.y = state.playerMesh.position.y + 1.2; // Eye height
+        camera.position.z = state.playerZ + 0.3; // Slightly forward from vehicle center
+        camera.lookAt(state.playerMesh.position.x, 0.8, state.playerZ + 50);
+        
+        // Camera shake / vibration — scales with speed (extra intense on rough patches)
+        let shakeAmp = 0.015 + speedNorm * 0.06;
+        if (onRoughPatch) shakeAmp *= 2.5;
+        camera.position.x += Math.sin(pz * 7.3)  * shakeAmp * 0.6;
+        camera.position.y += Math.sin(pz * 11.1) * shakeAmp * 0.35
+                           + Math.sin(pz * 5.7)  * shakeAmp * 0.2
+                           + (onRoughPatch ? Math.sin(pz * 15.3) * shakeAmp * 0.4 : 0);
+        
+        // Dynamic FOV — wider in first-person
+        const targetFov = 75 + speedNorm * 35;
+        camera.fov += (targetFov - camera.fov) * 3 * delta;
+        camera.updateProjectionMatrix();
+    } else {
+        // Third-person camera (low & close for claustrophobic speed feel)
+        const camTargetX = state.playerMesh.position.x * 0.5;
+        camera.position.x += (camTargetX - camera.position.x) * 5 * delta;
+        camera.position.y  = 3.0;
+        camera.position.z  = state.playerZ - 5.5;
+        camera.lookAt(state.playerMesh.position.x * 0.6, 0.5, state.playerZ + 12);
 
-    // Camera shake / vibration — scales with speed (extra intense on rough patches)
-    let shakeAmp = 0.012 + speedNorm * 0.05;
-    if (onRoughPatch) shakeAmp *= 2.0;
-    camera.position.x += Math.sin(pz * 7.3)  * shakeAmp * 0.5;
-    camera.position.y += Math.sin(pz * 11.1) * shakeAmp * 0.25
-                       + Math.sin(pz * 5.7)  * shakeAmp * 0.15
-                       + (onRoughPatch ? Math.sin(pz * 15.3) * shakeAmp * 0.3 : 0);
+        // Camera shake / vibration — scales with speed (extra intense on rough patches)
+        let shakeAmp = 0.012 + speedNorm * 0.05;
+        if (onRoughPatch) shakeAmp *= 2.0;
+        camera.position.x += Math.sin(pz * 7.3)  * shakeAmp * 0.5;
+        camera.position.y += Math.sin(pz * 11.1) * shakeAmp * 0.25
+                           + Math.sin(pz * 5.7)  * shakeAmp * 0.15
+                           + (onRoughPatch ? Math.sin(pz * 15.3) * shakeAmp * 0.3 : 0);
 
-    // Dynamic FOV — tight at low speed, wide at high speed
-    const targetFov = 58 + speedNorm * 30;
-    camera.fov += (targetFov - camera.fov) * 3 * delta;
-    camera.updateProjectionMatrix();
+        // Dynamic FOV — tight at low speed, wide at high speed
+        const targetFov = 58 + speedNorm * 30;
+        camera.fov += (targetFov - camera.fov) * 3 * delta;
+        camera.updateProjectionMatrix();
+    }
 
     // ---- Light follows player ----
     dirLight.position.set(state.playerMesh.position.x + 10, 20, state.playerZ + 15);

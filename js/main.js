@@ -28,6 +28,7 @@ const KEY_MAP = {
     ArrowLeft: "ArrowLeft", ArrowRight: "ArrowRight",
     w: "KeyW", W: "KeyW", a: "KeyA", A: "KeyA",
     s: "KeyS", S: "KeyS", d: "KeyD", D: "KeyD",
+    v: "KeyV", V: "KeyV",
     " ": "Space",
 };
 const KC_MAP = { 37: "ArrowLeft", 38: "ArrowUp", 39: "ArrowRight", 40: "ArrowDown", 32: "Space" };
