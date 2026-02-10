@@ -50,6 +50,7 @@ const $goDist     = document.getElementById("go-dist");
 const $goHS       = document.getElementById("gameover-highscore");
 const $warning    = document.getElementById("warning");
 const $speechBubbles = document.getElementById("speech-bubbles");
+const $controlsTooltip = document.getElementById("controls-tooltip");
 
 // =========================================================================
 //  Start / restart / back-to-menu
@@ -83,7 +84,16 @@ export function startGame(type) {
     $menu.classList.add("hidden");
     $gameover.classList.add("hidden");
     $hud.classList.remove("hidden");
+    $controlsTooltip.classList.remove("hidden");
     refreshHighScoreHUD();
+    
+    // Show touch zones on mobile, fade out after 4 seconds
+    const touchZones = document.getElementById("touch-zones");
+    if (touchZones) {
+        touchZones.classList.remove("fade-out");
+        touchZones.classList.remove("hidden");
+        setTimeout(() => touchZones.classList.add("fade-out"), 100);
+    }
 }
 
 export function restartGame() {
@@ -100,6 +110,11 @@ export function backToMenu() {
     $gameover.classList.add("hidden");
     $hud.classList.add("hidden");
     $menu.classList.remove("hidden");
+    $controlsTooltip.classList.add("hidden");
+    
+    // Hide touch zones
+    const touchZones = document.getElementById("touch-zones");
+    if (touchZones) touchZones.classList.add("hidden");
 }
 
 // =========================================================================
@@ -373,6 +388,7 @@ function triggerGameOver(obstacle) {
     $goHS.textContent      = "Best: " + formatDistance(state.highScore);
     $gameover.classList.remove("hidden");
     $hud.classList.add("hidden");
+    $controlsTooltip.classList.add("hidden");
 }
 
 // =========================================================================
